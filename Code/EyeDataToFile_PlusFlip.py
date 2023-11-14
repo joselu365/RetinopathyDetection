@@ -1,3 +1,12 @@
+""" ///////////////////////////////////////////////////////////////////////////////
+//                   Radt Eye
+// Date:         14/11/2023
+//
+// File: EyeDataToFile_PlusFlip.py
+// Description: Take data from csv file and adds extra info to file name, 
+//              in addition flip the right eyes to match the same direction.
+/////////////////////////////////////////////////////////////////////////////// """
+
 import csv
 import os
 from PIL import Image
@@ -78,15 +87,12 @@ def rename_files(csv_file_path, folder_path):
                 os.rename(old_path, new_path)
                 print(f"Renamed: {old_path} -> {new_path}")
 
-if __name__ == "__main__":
-    # Replace 'input.csv' and 'folder_path' with the actual CSV file and folder paths
-    csv_file_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/drLabels.csv'
-    folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/'
-    flipped_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/1Flipped/'
 
-    #rename_files(csv_file_path, folder_path)
-    # Call the function to flip right_flipped images in the specified directory
-    flip_images_in_directory(folder_path, flipped_path)
+# Replace 'input.csv' and 'folder_path' with the actual CSV file and folder paths
+csv_file_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/drLabels.csv'
+folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/'
+flipped_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/1Flipped/'
 
-
-
+#rename_files(csv_file_path, folder_path)
+# Call the function to flip right_flipped images in the specified directory
+flip_images_in_directory(folder_path, flipped_path)

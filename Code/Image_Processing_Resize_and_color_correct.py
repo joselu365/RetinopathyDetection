@@ -1,13 +1,22 @@
+""" ///////////////////////////////////////////////////////////////////////////////
+//                   Radt Eye
+// Date:         14/11/2023
+//
+// File: Image_Processing_Resize_and_color_correct.py
+// Description: Resize and color correct to have a consistan image set to feed
+//              the model to be trained.
+/////////////////////////////////////////////////////////////////////////////// """
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 
 # Set the directory path and file extension for the eye fundus images
-dir_path = 'C:/Users/bybli/Desktop/Fundus_dataflow/Original_images'
+dir_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/1Flipped/'
 
 # Set the desired output directory
-out_dir = 'C:/Users/bybli/Desktop/Fundus_dataflow/Resized_and_color_corrected'
+out_dir = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/2Resized-ColorCorrect/'
 
 # Set the desired suppression size
 suppress_size = 1000
