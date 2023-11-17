@@ -5,6 +5,10 @@
 // File: Image_Processing_TrainModel_RetinopathyDetection.py
 // Description: AI model training for eye issues detection
 /////////////////////////////////////////////////////////////////////////////// """
+
+# DIRECTLY FROM CHAT GPT NEEDS WORKKKKKKKKKKKKKKKKKKKKKKKKKK
+# Test commit - KE
+
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import numpy as np
