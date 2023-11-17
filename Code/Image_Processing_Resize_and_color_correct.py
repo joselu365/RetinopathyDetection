@@ -5,11 +5,13 @@
 // File: Image_Processing_Resize_and_color_correct.py
 // Description: Resize and color correct to have a consistan image set to feed
 //              the model to be trained.
+//
+//      NOT WORKING
+//
 /////////////////////////////////////////////////////////////////////////////// """
 
-import cv2
+import cv2  # to install (pip install opencv-python)
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 
 # Set the directory path and file extension for the eye fundus images
