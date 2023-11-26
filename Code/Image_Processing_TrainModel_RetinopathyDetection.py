@@ -6,58 +6,170 @@
 // Description: AI model training for eye issues detection
 /////////////////////////////////////////////////////////////////////////////// """
 
-# DIRECTLY FROM CHAT GPT NEEDS WORKKKKKKKKKKKKKKKKKKKKKKKKKK
-# Test commit - KE
+import matplotlib.pyplot as plt 
+import numpy as np 
+import os 
+import tensorflow as tf 
 
-import tensorflow as tf
-from sklearn.model_selection import train_test_split
-import numpy as np
-import os
+from keras.callbacks import ModelCheckpoint
 
-def preprocess_image(file_path, label):
-    img = tf.io.read_file(file_path)
-    img = tf.image.decode_jpeg(img, channels=3)
-    img = tf.image.resize(img, [128, 128])
-    img = img / 255.0
-    return img, label
+IMG_HEIGHT = 1000
+IMG_WIDTH = 1000
+BATCH_SIZE = 32
+EPOCH = 5
 
 def load_data(folder_path):
-    filenames = os.listdir(folder_path)
-    file_paths = [os.path.join(folder_path, filename) for filename in filenames]
-    labels = np.array([int(filename.split('')[1]) for filename in filenames])
+    train_ds = tf.keras.utils.image_dataset_from_directory(
+        folder_path,
+        validation_split=0.2,
+        subset="training",
+        shuffle=True,
+        seed=123,
+        image_size=(IMG_HEIGHT, IMG_WIDTH),
+        batch_size=BATCH_SIZE
+    )
 
-    train_files, val_files, train_labels, val_labels = train_test_split(
-        file_paths, labels, test_size=0.2, random_state=42)
+    val_ds = tf.keras.utils.image_dataset_from_directory(
+        folder_path,
+        validation_split=0.2,
+        subset="validation",
+        shuffle=True,
+        seed=123,
+        image_size=(IMG_HEIGHT, IMG_WIDTH),
+        batch_size=BATCH_SIZE
+    )
 
-    train_data = tf.data.Dataset.from_tensor_slices((train_files, train_labels))
-    train_data = train_data.map(preprocess_image).batch(32)
+    return train_ds, val_ds
 
-    val_data = tf.data.Dataset.from_tensor_slices((val_files, val_labels))
-    val_data = val_data.map(preprocess_image).batch(32)
+def normalized_model(ds):
+    # Standarize RGB from 0 to 1
+    normalization_layer = tf.keras.layers.Rescaling(1./255)
+    normalized_ds = ds.map(lambda x, y: (normalization_layer(x), y))
+    return normalized_ds
 
-    return train_data, val_data
+def build_model(train_normalized_ds, val_normalized_ds):
+    AUTOTUNE = tf.data.AUTOTUNE
 
-def build_model():
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-        tf.keras.layers.MaxPooling2D(2, 2),
-        # You can add more convolutional layers if needed
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(64, activation='relu'),
-        tf.keras.layers.Dense(6, activation='softmax')  # Assuming 6 categories (0-5)
+    train_normalized_ds = train_normalized_ds.cache().prefetch(buffer_size=AUTOTUNE)
+    val_normalized_ds = val_normalized_ds.cache().prefetch(buffer_size=AUTOTUNE)
+    
+    num_classes = 6
+
+    model = tf.keras.Sequential([
+    tf.keras.layers.Rescaling(1./255),
+    tf.keras.layers.Conv2D(32, 3, activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Conv2D(32, 3, activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Conv2D(32, 3, activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(num_classes)
     ])
+
+    model.compile(
+        optimizer='adam',
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        metrics=['accuracy']
+    )
     return model
 
-def main():
-    folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/1Flipped/'
-    train_data, val_data = load_data(folder_path)
+folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/2Organized/'
+train_ds, val_ds = load_data(folder_path)
 
-    model = build_model()
-    model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+# Class names atributtes aka health status
+class_names = train_ds.class_names
+print(class_names)
 
-    model.fit(train_data, validation_data=val_data, epochs=10)
+# Show samples of the dataset
+plt.figure(figsize=(10, 10))
+for images, labels in train_ds.take(1):
+  for i in range(9):
+    ax = plt.subplot(3, 3, i + 1)
+    plt.imshow(images[i].numpy().astype("uint8"))
+    plt.title(class_names[labels[i]])
+    plt.axis("off")
 
-    loss, accuracy = model.evaluate(val_data)
-    print("Validation accuracy:", accuracy)
+
+# Notice the pixel values are now in `[0,1]`.
+train_normalized_ds = normalized_model(train_ds)
+val_normalized_ds = normalized_model(val_ds)
+
+# show
+image_batch, labels_batch = next(iter(train_normalized_ds))
+first_image = image_batch[0]
+# Notice the pixel values are now in `[0,1]`.
+print(np.min(first_image), np.max(first_image))
+
+model = build_model(train_normalized_ds, val_normalized_ds)
+
+######################## First run of the model ########################
+################# Comment out to work on the same model #################
+checkpoint_path = "C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/cp_Health.ckpt"
+checkpoint_dir = os.path.dirname(checkpoint_path)
+
+# Create a callback that saves the model's weights
+checkpoint = ModelCheckpoint(
+    checkpoint_path, 
+    monitor='loss', 
+    verbose=1, 
+    save_best_only=True, 
+    mode='min'
+)
+
+# Run test training
+model.fit(
+    train_normalized_ds,
+    validation_data=val_normalized_ds,
+    epochs=EPOCH,
+    batch_size=BATCH_SIZE,
+    callbacks=[checkpoint]  # Pass callback to training
+)
+
+######################## Load model from checkpoint and train ########################
+# checkpoint_path = "C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/cp_Health.ckpt"
+# checkpoint_dir = os.path.dirname(checkpoint_path)
+
+# # Create a callback that saves the model's weights
+# checkpoint = ModelCheckpoint(
+#     checkpoint_path, 
+#     monitor='loss', 
+#     verbose=1, 
+#     save_best_only=True, 
+#     mode='min'
+# )
+
+# # Load the latest checkpoint
+# latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
+# if latest_checkpoint:
+#     # Restore the model and optimizer states
+#     checkpoint.restore(latest_checkpoint)
+#     print("Model restored from checkpoint.")
+
+# # Continue training or use the loaded model for inference
+# model.fit(
+#     train_normalized_ds,
+#     validation_data=val_normalized_ds,
+#     epochs=EPOCH,
+#     batch_size=BATCH_SIZE,
+#     callbacks=[checkpoint]  # Pass callback to training
+# )
+
+
+######################## Save complet mode to H5 ########################
+# model_final = "'C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/model_Health.h5"
+# checkpoint_dir = os.path.dirname(checkpoint_path)
+
+# # Create a callback that saves the model's weights
+# checkpoint = ModelCheckpoint(checkpoint_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
+# callbacks_list = [checkpoint]
+
+# # Run test training
+# model.fit(
+#     train_normalized_ds,
+#     validation_data=val_normalized_ds,
+#     epochs=EPOCH,
+#     batch_size=BATCH_SIZE,
+#     callbacks=[callbacks_list]  # Pass callback to training
+# )

@@ -9,6 +9,7 @@
 
 import csv
 import os
+import shutil
 from PIL import Image
 
 def flip_images_in_directory(directory, flipped_path):
@@ -75,10 +76,6 @@ def rename_files(csv_file_path, folder_path):
                 old_path = os.path.join(folder_path, file_name_with_extension)
                 if side == "1":
                     new_name = f"{base_name}_{health}_right_flipped{file_extension}"
-                    # Flip the image and save it with the new name
-                    #new_path = os.path.join(folder_path, new_name)
-                    #flip_image(old_path, new_path)
-                    #print(f"Flipped and renamed: {old_path} -> {new_path}")
                 if side == "0":
                     new_name = f"{base_name}_{health}_left{file_extension}"
                     
@@ -88,11 +85,36 @@ def rename_files(csv_file_path, folder_path):
                 print(f"Renamed: {old_path} -> {new_path}")
 
 
+
+def organize_files(folder_path, organized_path):
+    # Create subfolders based on the second number
+    subfolders = set()
+
+    # Iterate through files in the folder
+    for filename in os.listdir(folder_path):
+        if os.path.isfile(os.path.join(folder_path, filename)):
+            # Extract the second number from the file name
+            print(filename)
+            second_number = filename.split('_')[1]
+            second_number
+            # Create a subfolder for each unique second number
+            subfolder_path = os.path.join(organized_path, second_number)
+            subfolder_path
+            if second_number not in subfolders:
+                os.makedirs(subfolder_path)
+                subfolders.add(second_number)
+
+            # Move the file to the corresponding subfolder
+            shutil.copy(os.path.join(folder_path, filename), os.path.join(subfolder_path, filename))
+
 # Replace 'input.csv' and 'folder_path' with the actual CSV file and folder paths
 csv_file_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/drLabels.csv'
 folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/0original/'
 flipped_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/1Flipped/'
+organized_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/2Organized/'
 
 #rename_files(csv_file_path, folder_path)
 # Call the function to flip right_flipped images in the specified directory
-flip_images_in_directory(folder_path, flipped_path)
+#flip_images_in_directory(folder_path, flipped_path)
+
+organize_files(flipped_path, organized_path)
