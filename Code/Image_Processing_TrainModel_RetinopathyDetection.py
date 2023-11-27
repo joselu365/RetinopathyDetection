@@ -11,22 +11,26 @@ import numpy as np
 import os 
 import tensorflow as tf 
 
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 
-IMG_HEIGHT = 1000
-IMG_WIDTH = 1000
-BATCH_SIZE = 32
-EPOCH = 5
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR) 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Avoid annoying errors
+
+batch_size = 32
+epoch = 200
 
 def load_data(folder_path):
+    img_height = 1000
+    img_width = 1000
     train_ds = tf.keras.utils.image_dataset_from_directory(
         folder_path,
         validation_split=0.2,
         subset="training",
         shuffle=True,
         seed=123,
-        image_size=(IMG_HEIGHT, IMG_WIDTH),
-        batch_size=BATCH_SIZE
+        image_size=(img_height, img_width),
+        batch_size=batch_size
     )
 
     val_ds = tf.keras.utils.image_dataset_from_directory(
@@ -35,8 +39,8 @@ def load_data(folder_path):
         subset="validation",
         shuffle=True,
         seed=123,
-        image_size=(IMG_HEIGHT, IMG_WIDTH),
-        batch_size=BATCH_SIZE
+        image_size=(img_height, img_width),
+        batch_size=batch_size
     )
 
     return train_ds, val_ds
@@ -75,7 +79,7 @@ def build_model(train_normalized_ds, val_normalized_ds):
     )
     return model
 
-folder_path = 'C:/Users/JoseLu/Desktop/Fundus_dataflow/Database/2Organized/'
+folder_path = '/home/nnds3a/Documents/RadtEye/Database/2Organized'
 train_ds, val_ds = load_data(folder_path)
 
 # Class names atributtes aka health status
@@ -83,13 +87,13 @@ class_names = train_ds.class_names
 print(class_names)
 
 # Show samples of the dataset
-plt.figure(figsize=(10, 10))
-for images, labels in train_ds.take(1):
-  for i in range(9):
-    ax = plt.subplot(3, 3, i + 1)
-    plt.imshow(images[i].numpy().astype("uint8"))
-    plt.title(class_names[labels[i]])
-    plt.axis("off")
+# plt.figure(figsize=(10, 10))
+# for images, labels in train_ds.take(1):
+#   for i in range(9):
+#     ax = plt.subplot(3, 3, i + 1)
+#     plt.imshow(images[i].numpy().astype("uint8"))
+#     plt.title(class_names[labels[i]])
+#     plt.axis("off")
 
 
 # Notice the pixel values are now in `[0,1]`.
@@ -105,71 +109,93 @@ print(np.min(first_image), np.max(first_image))
 model = build_model(train_normalized_ds, val_normalized_ds)
 
 ######################## First run of the model ########################
-################# Comment out to work on the same model #################
-checkpoint_path = "C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/cp_Health.ckpt"
-checkpoint_dir = os.path.dirname(checkpoint_path)
-
-# Create a callback that saves the model's weights
-checkpoint = ModelCheckpoint(
-    checkpoint_path, 
-    monitor='loss', 
-    verbose=1, 
-    save_best_only=True, 
-    mode='min'
-)
-
-# Run test training
-model.fit(
-    train_normalized_ds,
-    validation_data=val_normalized_ds,
-    epochs=EPOCH,
-    batch_size=BATCH_SIZE,
-    callbacks=[checkpoint]  # Pass callback to training
-)
-
-######################## Load model from checkpoint and train ########################
-# checkpoint_path = "C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/cp_Health.ckpt"
+################# Comment out to work on the same model ################# https://www.tensorflow.org/tutorials/keras/save_and_load#checkpoint_callback_options
+# model_path = "Training/MyModel.keras"
+# checkpoint_path = "Training/cp.ckpt"
 # checkpoint_dir = os.path.dirname(checkpoint_path)
 
-# # Create a callback that saves the model's weights
-# checkpoint = ModelCheckpoint(
-#     checkpoint_path, 
-#     monitor='loss', 
-#     verbose=1, 
-#     save_best_only=True, 
-#     mode='min'
-# )
-
-# # Load the latest checkpoint
-# latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
-# if latest_checkpoint:
-#     # Restore the model and optimizer states
-#     checkpoint.restore(latest_checkpoint)
-#     print("Model restored from checkpoint.")
-
-# # Continue training or use the loaded model for inference
-# model.fit(
-#     train_normalized_ds,
-#     validation_data=val_normalized_ds,
-#     epochs=EPOCH,
-#     batch_size=BATCH_SIZE,
-#     callbacks=[checkpoint]  # Pass callback to training
-# )
-
-
-######################## Save complet mode to H5 ########################
-# model_final = "'C:/Users/JoseLu/Desktop/Fundus_dataflow/Training/model_Health.h5"
-# checkpoint_dir = os.path.dirname(checkpoint_path)
-
-# # Create a callback that saves the model's weights
-# checkpoint = ModelCheckpoint(checkpoint_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
-# callbacks_list = [checkpoint]
+# keras_callbacks   = [
+#     EarlyStopping(
+#         monitor='val_loss', 
+#         patience=5, 
+#         mode='min', 
+#         min_delta=0.0001
+#     ),
+#     ModelCheckpoint(
+#         checkpoint_path, 
+#         monitor='loss', 
+#         verbose=1, 
+#         save_best_only=True, 
+#         save_weights_only=True,
+#         mode='min'
+#     )
+# ]
 
 # # Run test training
 # model.fit(
 #     train_normalized_ds,
 #     validation_data=val_normalized_ds,
-#     epochs=EPOCH,
-#     batch_size=BATCH_SIZE,
-#     callbacks=[callbacks_list]  # Pass callback to training
+#     epochs=epoch,
+#     batch_size=batch_size,
+#     callbacks=[keras_callbacks]  # Pass callback to training
 # )
+
+# model.save(model_path)
+
+
+# # Evaluate the model
+# loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
+# print("Untrained model, accuracy: {:5.2f}%".format(100 * acc))
+
+# # Loads the weights
+# model.load_weights(checkpoint_path)
+
+# # Re-evaluate the model
+# loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
+# print("Restored model, accuracy: {:5.2f}%".format(100 * acc))
+
+
+######################## Load model from checkpoint and train ########################
+model_path = "Training/MyModel.keras"
+checkpoint_path = "Training/cp.ckpt"
+checkpoint_dir = os.path.dirname(checkpoint_path)
+
+model.load_weights(checkpoint_path) # load checkpoint
+
+# Create a callback that saves the model's weights
+keras_callbacks   = [
+    EarlyStopping(
+        monitor='val_loss', 
+        patience=30, 
+        mode='min',
+        min_delta=0.00001
+    ),
+    ModelCheckpoint(
+        checkpoint_path, 
+        monitor='loss', 
+        verbose=1, 
+        save_best_only=True, 
+        save_weights_only=True,
+        mode='min'
+    )
+]
+
+# Continue training or use the loaded model for inference
+model.fit(
+    train_normalized_ds,
+    validation_data=val_normalized_ds,
+    epochs=epoch,
+    batch_size=batch_size,
+    callbacks=[keras_callbacks]  # Pass callback to training
+)
+
+model.save(model_path)
+
+######################## Save complet mode to H5 ########################
+# model_final = "/Training/model_Health.h5"
+# checkpoint_path = "/Training/"
+
+# model.load_weights(checkpoint_path) # load checkpoint
+
+# model.save(model_final, save_format="h5")
+
