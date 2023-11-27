@@ -108,40 +108,7 @@ print(np.min(first_image), np.max(first_image))
 
 model = build_model(train_normalized_ds, val_normalized_ds)
 
-######################## First run of the model ########################
-################# Comment out to work on the same model ################# https://www.tensorflow.org/tutorials/keras/save_and_load#checkpoint_callback_options
-# model_path = "Training/MyModel.keras"
-# checkpoint_path = "Training/cp.ckpt"
-# checkpoint_dir = os.path.dirname(checkpoint_path)
-
-# keras_callbacks   = [
-#     EarlyStopping(
-#         monitor='val_loss', 
-#         patience=5, 
-#         mode='min', 
-#         min_delta=0.0001
-#     ),
-#     ModelCheckpoint(
-#         checkpoint_path, 
-#         monitor='loss', 
-#         verbose=1, 
-#         save_best_only=True, 
-#         save_weights_only=True,
-#         mode='min'
-#     )
-# ]
-
-# # Run test training
-# model.fit(
-#     train_normalized_ds,
-#     validation_data=val_normalized_ds,
-#     epochs=epoch,
-#     batch_size=batch_size,
-#     callbacks=[keras_callbacks]  # Pass callback to training
-# )
-
-# model.save(model_path)
-
+######################## Train model ######################## https://www.tensorflow.org/tutorials/keras/save_and_load#checkpoint_callback_options
 
 # # Evaluate the model
 # loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
@@ -154,13 +121,11 @@ model = build_model(train_normalized_ds, val_normalized_ds)
 # loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
 # print("Restored model, accuracy: {:5.2f}%".format(100 * acc))
 
-
-######################## Load model from checkpoint and train ########################
 model_path = "Training/MyModel.keras"
 checkpoint_path = "Training/cp.ckpt"
 checkpoint_dir = os.path.dirname(checkpoint_path)
 
-model.load_weights(checkpoint_path) # load checkpoint
+# model.load_weights(checkpoint_path) # load checkpoint
 
 # Create a callback that saves the model's weights
 keras_callbacks   = [
@@ -172,7 +137,7 @@ keras_callbacks   = [
     ),
     ModelCheckpoint(
         checkpoint_path, 
-        monitor='loss', 
+        monitor='val_loss', 
         verbose=1, 
         save_best_only=True, 
         save_weights_only=True,
@@ -180,7 +145,7 @@ keras_callbacks   = [
     )
 ]
 
-# Continue training or use the loaded model for inference
+# Train
 model.fit(
     train_normalized_ds,
     validation_data=val_normalized_ds,
@@ -198,4 +163,3 @@ model.save(model_path)
 # model.load_weights(checkpoint_path) # load checkpoint
 
 # model.save(model_final, save_format="h5")
-
