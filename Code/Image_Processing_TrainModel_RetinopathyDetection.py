@@ -13,16 +13,13 @@ import tensorflow as tf
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
-import absl.logging
-absl.logging.set_verbosity(absl.logging.ERROR) 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Avoid annoying errors
-
 batch_size = 32
-epoch = 200
+epoch = 5000
 
 def load_data(folder_path):
-    img_height = 1000
-    img_width = 1000
+    img_height = 800
+    img_width = 800
+
     train_ds = tf.keras.utils.image_dataset_from_directory(
         folder_path,
         validation_split=0.2,
@@ -51,6 +48,38 @@ def normalized_model(ds):
     normalized_ds = ds.map(lambda x, y: (normalization_layer(x), y))
     return normalized_ds
 
+def augment_model(ds):
+    # Function for brightness adjustment
+    def adjust_brightness(image):
+        # Generate a random value for brightness adjustment between -0.2 and 0.2
+        delta = tf.random.uniform([], -0.3, 0.3)
+        return tf.image.adjust_brightness(image, delta=delta)
+
+    # Function for random contrast adjustment
+    def adjust_contrast(image):
+        # Generate a random value for contrast adjustment between 0.8 and 1.2
+        contrast_factor = tf.random.uniform([], 0.8, 1.2)
+        return tf.image.adjust_contrast(image, contrast_factor=contrast_factor)
+
+    # Data augmentation and normalization
+    data_augmentation = tf.keras.Sequential([
+        tf.keras.layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
+        tf.keras.layers.Lambda(adjust_brightness),  # Apply brightness adjustment
+        tf.keras.layers.Lambda(adjust_contrast),    # Apply contrast adjustment
+    ])
+
+    # Apply augmentation and normalization to the dataset
+    augmented_samples = ds.map(lambda x, y: (data_augmentation(x), y))
+
+    # Concatenate the augmented samples with the original dataset
+    augmented_ds = ds.concatenate(augmented_samples)
+
+    # Configure the dataset for performance
+    augmented_ds = augmented_ds.cache().prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    
+    return normalized_model(augmented_ds)
+
 def build_model(train_normalized_ds, val_normalized_ds):
     AUTOTUNE = tf.data.AUTOTUNE
 
@@ -72,6 +101,15 @@ def build_model(train_normalized_ds, val_normalized_ds):
     tf.keras.layers.Dense(num_classes)
     ])
 
+    # lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
+    #     0.001,
+    #     decay_steps=batch_size*1000,
+    #     decay_rate=1,
+    #     staircase=False
+    # )
+
+    # tf.keras.optimizers.Adam(lr_schedule)
+
     model.compile(
         optimizer='adam',
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -83,8 +121,8 @@ folder_path = '/home/nnds3a/Documents/RadtEye/Database/2Organized'
 train_ds, val_ds = load_data(folder_path)
 
 # Class names atributtes aka health status
-class_names = train_ds.class_names
-print(class_names)
+# class_names = train_ds.class_names
+# print(class_names)
 
 # Show samples of the dataset
 # plt.figure(figsize=(10, 10))
@@ -97,14 +135,14 @@ print(class_names)
 
 
 # Notice the pixel values are now in `[0,1]`.
-train_normalized_ds = normalized_model(train_ds)
+train_normalized_ds = augment_model(train_ds)
 val_normalized_ds = normalized_model(val_ds)
 
 # show
-image_batch, labels_batch = next(iter(train_normalized_ds))
-first_image = image_batch[0]
+# image_batch, labels_batch = next(iter(train_normalized_ds))
+# first_image = image_batch[0]
 # Notice the pixel values are now in `[0,1]`.
-print(np.min(first_image), np.max(first_image))
+# print(np.min(first_image), np.max(first_image))
 
 model = build_model(train_normalized_ds, val_normalized_ds)
 
@@ -129,12 +167,6 @@ checkpoint_dir = os.path.dirname(checkpoint_path)
 
 # Create a callback that saves the model's weights
 keras_callbacks   = [
-    EarlyStopping(
-        monitor='val_loss', 
-        patience=30, 
-        mode='min',
-        min_delta=0.00001
-    ),
     ModelCheckpoint(
         checkpoint_path, 
         monitor='val_loss', 
