@@ -10,20 +10,18 @@ import matplotlib.pyplot as plt
 import numpy as np 
 import os 
 import tensorflow as tf 
-
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR) 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Avoid annoying errors
 
-batch_size = 32
-epoch = 30
-lr_schedule = 0.1
+batch_size = 16
+epoch = 60
 
 def load_data(folder_path):
-    img_height = 800
-    img_width = 800
+    img_height = 512
+    img_width = 512
 
     train_ds = tf.keras.utils.image_dataset_from_directory(
         folder_path,
@@ -68,8 +66,8 @@ def augment_model(ds):
 
     # Data augmentation and normalization
     data_augmentation = tf.keras.Sequential([
-        tf.keras.layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
+        tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+        tf.keras.layers.RandomRotation(0.2),
         tf.keras.layers.Lambda(adjust_brightness),  # Apply brightness adjustment
         tf.keras.layers.Lambda(adjust_contrast),    # Apply contrast adjustment
     ])
@@ -92,89 +90,50 @@ def build_model(train_normalized_ds, val_normalized_ds):
     val_normalized_ds = val_normalized_ds.cache().prefetch(buffer_size=AUTOTUNE)
     
     num_classes = 6
-
     model = tf.keras.Sequential([
-    tf.keras.layers.Rescaling(1./255),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dense(num_classes)
+        tf.keras.layers.Conv2D(64, 3, activation='relu'),  # Increased filters in Conv2D layers
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(128, 3, activation='relu'),  # Increased filters
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(256, 3, activation='relu'),  # Increased filters
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(256, activation='relu'),  # Increased units in Dense layer
+        tf.keras.layers.Dropout(0.5),  # Adding dropout for regularization
+        tf.keras.layers.Dense(num_classes)
     ])
 
-    # lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
-    #     0.001,
-    #     decay_steps=batch_size*1000,
-    #     decay_rate=1,
-    #     staircase=False
-    # )
-
-    tf.keras.optimizers.Adam(lr_schedule)
+    # Adjusted learning rate
+    initial_learning_rate = 0.001
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate, decay_steps=100000, decay_rate=0.96, staircase=True
+    )
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
     model.compile(
-        optimizer='adam',
+        optimizer=optimizer,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=['accuracy']
     )
     return model
 
-folder_path = '/home/nnds3a/Documents/RadtEye/Database/2Organized'
+folder_path = 'Database/NewBigMama/2Organized'
 train_ds, val_ds = load_data(folder_path)
 
-# Class names atributtes aka health status
-# class_names = train_ds.class_names
-# print(class_names)
-
-# Show samples of the dataset
-# plt.figure(figsize=(10, 10))
-# for images, labels in train_ds.take(1):
-#   for i in range(9):
-#     ax = plt.subplot(3, 3, i + 1)
-#     plt.imshow(images[i].numpy().astype("uint8"))
-#     plt.title(class_names[labels[i]])
-#     plt.axis("off")
-
-
-# Notice the pixel values are now in `[0,1]`.
 train_normalized_ds = augment_model(train_ds)
 val_normalized_ds = normalized_model(val_ds)
-
-# show
-# image_batch, labels_batch = next(iter(train_normalized_ds))
-# first_image = image_batch[0]
-# Notice the pixel values are now in `[0,1]`.
-# print(np.min(first_image), np.max(first_image))
 
 model = build_model(train_normalized_ds, val_normalized_ds)
 
 ######################## Train model ######################## https://www.tensorflow.org/tutorials/keras/save_and_load#checkpoint_callback_options
-
-# # Evaluate the model
-# loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
-# print("Untrained model, accuracy: {:5.2f}%".format(100 * acc))
-
-# # Loads the weights
-# model.load_weights(checkpoint_path)
-
-# # Re-evaluate the model
-# loss, acc = model.evaluate(image_batch, labels_batch, verbose=2)
-# print("Restored model, accuracy: {:5.2f}%".format(100 * acc))
-
-# model_path = "Training/MyModel.keras"
-checkpoint_path = "Training/cp.ckpt"
+checkpoint_path = "Training2/cp.weights.h5"
 checkpoint_dir = os.path.dirname(checkpoint_path)
 
-
-
 # Create a callback that saves the model's weights
-keras_callbacks   = [
+keras_callbacks = [
     EarlyStopping(
         monitor='val_loss', 
-        patience=30, 
+        patience=8, 
         mode='min',
         min_delta=0.00001
     ),
@@ -189,31 +148,12 @@ keras_callbacks   = [
 ]
 
 # Train
-for i in range(49):  # Change 5 to the number of iterations you want
-    model.load_weights(checkpoint_path) # load checkpoint
-    print("Weights loaded")
-    
-    model.fit(
-        train_normalized_ds,
-        validation_data=val_normalized_ds,
-        epochs=epoch,
-        batch_size=batch_size,
-        callbacks=[keras_callbacks]  # Pass callback to training
-    )
-    
-    # if (i + 1) % 4 == 0:  # Check if it's a multiple of 4
-    lr_schedule = lr_schedule / 10  # Update the learning rate schedule
-    print("Update learning rate: ", lr_schedule)
-    model = build_model(train_normalized_ds, val_normalized_ds)
-    
-    model_path = f"Training/MyModel_0{i}.keras"  # Creating the file name with the loop number
-    model.save(model_path)
+model.fit(
+    train_normalized_ds,
+    validation_data=val_normalized_ds,
+    epochs=epoch,
+    batch_size=batch_size,
+    callbacks=[keras_callbacks]  # Pass callback to training
+)
 
- 
-######################## Save complet mode to H5 ########################
-# model_final = "/Training/model_Health.h5"
-# checkpoint_path = "/Training/"
-
-# model.load_weights(checkpoint_path) # load checkpoint
-
-# model.save(model_final, save_format="h5")
+model.save("Training2/NewLayer.h5")
